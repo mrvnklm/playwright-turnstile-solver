@@ -1,4 +1,4 @@
-# turnstile-solver
+# playwright-turnstile-solver
 
 Cloudflare Turnstile auto-solver using ghost-cursor mouse simulation.
 

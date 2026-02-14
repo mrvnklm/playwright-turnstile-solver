@@ -7,7 +7,7 @@ Solves Turnstile challenges by locating the cross-origin iframe, computing the c
 ## Install
 
 ```bash
-bun add github:mrvnklm/turnstile-solver
+bun add github:mrvnklm/playwright-turnstile-solver
 ```
 
 ## Usage

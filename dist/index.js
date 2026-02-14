@@ -58,13 +58,18 @@ async function raceContentOrTurnstile(page, contentSelector, log) {
   return "blocked";
 }
 async function isTurnstileResolved(page) {
-  const iframe = await page.$(TURNSTILE_IFRAME_SELECTOR).catch(() => null);
-  if (!iframe) return true;
-  const hasToken = await page.evaluate(() => {
-    const input = document.querySelector('[name="cf-turnstile-response"]');
-    return input !== null && input.value.length > 0;
-  }).catch(() => false);
-  return hasToken;
+  return page.evaluate((iframeSel) => {
+    const iframe = document.querySelector(iframeSel);
+    const tokenInput = document.querySelector('[name="cf-turnstile-response"]');
+    if (tokenInput && tokenInput.value.length > 0) return true;
+    if (iframe) return false;
+    const challengeIndicators = document.querySelector(
+      ".cf-turnstile, #challenge-running, #challenge-stage, #challenge-form"
+    );
+    return !challengeIndicators;
+  }, TURNSTILE_IFRAME_SELECTOR).catch(() => {
+    return true;
+  });
 }
 async function waitForTurnstileResolution(page, timeout) {
   const deadline = Date.now() + timeout;

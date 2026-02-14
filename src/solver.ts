@@ -129,18 +129,32 @@ export async function raceContentOrTurnstile(
 /**
  * Check if the Turnstile challenge has resolved.
  * Language-independent: checks DOM structure instead of page title text.
+ *
+ * During the managed check phase the Turnstile iframe can briefly disappear
+ * from the DOM (or its src changes), so iframe absence alone is not enough.
+ * We also verify that no challenge-page indicators remain.
  */
 async function isTurnstileResolved(page: Page): Promise<boolean> {
-  // Primary: iframe removed from DOM (standalone challenge page redirected)
-  const iframe = await page.$(TURNSTILE_IFRAME_SELECTOR).catch(() => null)
-  if (!iframe) return true
+  return page.evaluate((iframeSel) => {
+    const iframe = document.querySelector(iframeSel)
+    // Token populated → definitely solved (works for inline widgets)
+    const tokenInput = document.querySelector('[name="cf-turnstile-response"]') as HTMLInputElement | null
+    if (tokenInput && tokenInput.value.length > 0) return true
 
-  // Secondary: response token populated (inline widget solved)
-  const hasToken = await page.evaluate(() => {
-    const input = document.querySelector('[name="cf-turnstile-response"]') as HTMLInputElement | null
-    return input !== null && input.value.length > 0
-  }).catch(() => false)
-  return hasToken
+    // Iframe still present → not resolved
+    if (iframe) return false
+
+    // Iframe gone — but is the challenge page also gone?
+    // During the managed check spinner the iframe can briefly disappear
+    // while the challenge page (.cf-turnstile, #challenge-running) persists.
+    const challengeIndicators = document.querySelector(
+      '.cf-turnstile, #challenge-running, #challenge-stage, #challenge-form'
+    )
+    return !challengeIndicators
+  }, TURNSTILE_IFRAME_SELECTOR).catch(() => {
+    // page.evaluate failed — page likely navigated away (= resolved)
+    return true
+  })
 }
 
 /**

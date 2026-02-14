@@ -127,6 +127,36 @@ export async function raceContentOrTurnstile(
 }
 
 /**
+ * Check if the Turnstile challenge has resolved.
+ * Language-independent: checks DOM structure instead of page title text.
+ */
+async function isTurnstileResolved(page: Page): Promise<boolean> {
+  // Primary: iframe removed from DOM (standalone challenge page redirected)
+  const iframe = await page.$(TURNSTILE_IFRAME_SELECTOR).catch(() => null)
+  if (!iframe) return true
+
+  // Secondary: response token populated (inline widget solved)
+  const hasToken = await page.evaluate(() => {
+    const input = document.querySelector('[name="cf-turnstile-response"]') as HTMLInputElement | null
+    return input !== null && input.value.length > 0
+  }).catch(() => false)
+  return hasToken
+}
+
+/**
+ * Poll for Turnstile resolution with timeout.
+ * Uses isTurnstileResolved() for language-independent detection.
+ */
+async function waitForTurnstileResolution(page: Page, timeout: number): Promise<boolean> {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 500))
+    if (await isTurnstileResolved(page)) return true
+  }
+  return false
+}
+
+/**
  * Click the Turnstile checkbox using ghost-cursor Bezier movement.
  * Retries up to MAX_ATTEMPTS times with slight coordinate jitter.
  */
@@ -147,12 +177,11 @@ async function clickTurnstileCheckbox(
   // to the interactive "Verify you are human" checkbox (~3-5s).
   // The managed check runs automatically first — if it passes, the page
   // redirects with no click needed. If it fails, the checkbox appears.
-  // We poll the page title to detect early resolution.
+  // We poll for iframe disappearance to detect early resolution (language-independent).
   info('Waiting for widget to become interactive...')
   for (let waited = 0; waited < 5000; waited += 500) {
     await new Promise(r => setTimeout(r, 500))
-    const title = await page.title().catch(() => '')
-    if (!title.toLowerCase().includes('just a moment')) {
+    if (await isTurnstileResolved(page)) {
       info('Page resolved during managed check — no click needed')
       await screenshot(page, 'managed-resolve', info)
       return true
@@ -190,14 +219,8 @@ async function clickTurnstileCheckbox(
     await new Promise((r) => setTimeout(r, 2000))
     await screenshot(page, `after-delay-${attempt}`, info)
 
-    // Wait for challenge resolution — title changes from "Just a moment..."
-    const resolved = await page
-      .waitForFunction(
-        () => !document.title.toLowerCase().includes('just a moment'),
-        { timeout: WAIT_FOR_RESOLVE_MS },
-      )
-      .then(() => true)
-      .catch(() => false)
+    // Wait for challenge resolution — iframe disappears when solved (language-independent)
+    const resolved = await waitForTurnstileResolution(page, WAIT_FOR_RESOLVE_MS)
 
     if (resolved) {
       await screenshot(page, 'solved', info)

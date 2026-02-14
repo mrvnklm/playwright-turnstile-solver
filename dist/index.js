@@ -57,6 +57,23 @@ async function raceContentOrTurnstile(page, contentSelector, log) {
   }
   return "blocked";
 }
+async function isTurnstileResolved(page) {
+  const iframe = await page.$(TURNSTILE_IFRAME_SELECTOR).catch(() => null);
+  if (!iframe) return true;
+  const hasToken = await page.evaluate(() => {
+    const input = document.querySelector('[name="cf-turnstile-response"]');
+    return input !== null && input.value.length > 0;
+  }).catch(() => false);
+  return hasToken;
+}
+async function waitForTurnstileResolution(page, timeout) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 500));
+    if (await isTurnstileResolved(page)) return true;
+  }
+  return false;
+}
 async function clickTurnstileCheckbox(page, iframe, info) {
   const box = await iframe.boundingBox();
   if (!box) {
@@ -67,8 +84,7 @@ async function clickTurnstileCheckbox(page, iframe, info) {
   info("Waiting for widget to become interactive...");
   for (let waited = 0; waited < 5e3; waited += 500) {
     await new Promise((r) => setTimeout(r, 500));
-    const title = await page.title().catch(() => "");
-    if (!title.toLowerCase().includes("just a moment")) {
+    if (await isTurnstileResolved(page)) {
       info("Page resolved during managed check \u2014 no click needed");
       await screenshot(page, "managed-resolve", info);
       return true;
@@ -89,10 +105,7 @@ async function clickTurnstileCheckbox(page, iframe, info) {
     await screenshot(page, `after-click-${attempt}`, info);
     await new Promise((r) => setTimeout(r, 2e3));
     await screenshot(page, `after-delay-${attempt}`, info);
-    const resolved = await page.waitForFunction(
-      () => !document.title.toLowerCase().includes("just a moment"),
-      { timeout: WAIT_FOR_RESOLVE_MS }
-    ).then(() => true).catch(() => false);
+    const resolved = await waitForTurnstileResolution(page, WAIT_FOR_RESOLVE_MS);
     if (resolved) {
       await screenshot(page, "solved", info);
       info("Turnstile solved!");

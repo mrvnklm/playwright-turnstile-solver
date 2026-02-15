@@ -128,31 +128,41 @@ export async function raceContentOrTurnstile(
 
 /**
  * Check if the Turnstile challenge has resolved.
- * Language-independent: checks DOM structure instead of page title text.
  *
- * During the managed check phase the Turnstile iframe can briefly disappear
- * from the DOM (or its src changes), so iframe absence alone is not enough.
- * We also verify that no challenge-page indicators remain.
+ * Uses only stable, light-DOM selectors that work universally across all
+ * Cloudflare-protected sites regardless of locale or CSS class changes:
+ *
+ *  1. `[name="cf-turnstile-response"]` — Turnstile's form contract token input.
+ *     Present from page load with empty value; populated when solved.
+ *  2. `script[src*="/cdn-cgi/challenge-platform/"]` — Cloudflare's challenge
+ *     orchestrator script in `<head>`, present on all challenge pages.
+ *
+ * The Turnstile iframe itself lives inside a **closed Shadow DOM**, so
+ * `document.querySelector('iframe[src*="challenges.cloudflare.com"]')`
+ * always returns null from page context. These light-DOM selectors avoid
+ * that limitation entirely.
  */
 async function isTurnstileResolved(page: Page): Promise<boolean> {
-  return page.evaluate((iframeSel) => {
-    const iframe = document.querySelector(iframeSel)
-    // Token populated → definitely solved (works for inline widgets)
-    const tokenInput = document.querySelector('[name="cf-turnstile-response"]') as HTMLInputElement | null
+  return page.evaluate(() => {
+    // 1. Token populated → definitely solved
+    const tokenInput = document.querySelector(
+      '[name="cf-turnstile-response"]'
+    ) as HTMLInputElement | null
     if (tokenInput && tokenInput.value.length > 0) return true
 
-    // Iframe still present → not resolved
-    if (iframe) return false
-
-    // Iframe gone — but is the challenge page also gone?
-    // During the managed check spinner the iframe can briefly disappear
-    // while the challenge page (.cf-turnstile, #challenge-running) persists.
-    const challengeIndicators = document.querySelector(
-      '.cf-turnstile, #challenge-running, #challenge-stage, #challenge-form'
+    // 2. Challenge platform script still in <head> → challenge page active
+    const challengeScript = document.querySelector(
+      'script[src*="/cdn-cgi/challenge-platform/"]'
     )
-    return !challengeIndicators
-  }, TURNSTILE_IFRAME_SELECTOR).catch(() => {
-    // page.evaluate failed — page likely navigated away (= resolved)
+    if (challengeScript) return false
+
+    // 3. Token input exists but empty → still solving
+    if (tokenInput) return false
+
+    // 4. No token input, no challenge script → page navigated away
+    return true
+  }).catch(() => {
+    // page.evaluate failed — page likely navigated (= resolved)
     return true
   })
 }

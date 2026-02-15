@@ -58,16 +58,18 @@ async function raceContentOrTurnstile(page, contentSelector, log) {
   return "blocked";
 }
 async function isTurnstileResolved(page) {
-  return page.evaluate((iframeSel) => {
-    const iframe = document.querySelector(iframeSel);
-    const tokenInput = document.querySelector('[name="cf-turnstile-response"]');
-    if (tokenInput && tokenInput.value.length > 0) return true;
-    if (iframe) return false;
-    const challengeIndicators = document.querySelector(
-      ".cf-turnstile, #challenge-running, #challenge-stage, #challenge-form"
+  return page.evaluate(() => {
+    const tokenInput = document.querySelector(
+      '[name="cf-turnstile-response"]'
     );
-    return !challengeIndicators;
-  }, TURNSTILE_IFRAME_SELECTOR).catch(() => {
+    if (tokenInput && tokenInput.value.length > 0) return true;
+    const challengeScript = document.querySelector(
+      'script[src*="/cdn-cgi/challenge-platform/"]'
+    );
+    if (challengeScript) return false;
+    if (tokenInput) return false;
+    return true;
+  }).catch(() => {
     return true;
   });
 }

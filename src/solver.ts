@@ -6,7 +6,7 @@
  *  1. Locate the iframe element on the parent page
  *  2. Get its bounding box (works without cross-origin access)
  *  3. Use ghost-cursor to move the mouse along a Bezier curve to the
- *     checkbox coordinates (~28-36px from left, vertically centered)
+ *     checkbox coordinates (~24-40px from left, vertically centered)
  *  4. Click with human-like hesitation
  *
  * ghost-cursor generates Fitts's Law-timed Bezier paths that are
@@ -214,16 +214,19 @@ async function clickTurnstileCheckbox(
 
   await screenshot(page, 'widget-ready', info)
 
-  const cursor = createCursor(page as any)
-
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // Fresh cursor with random origin each attempt — different Bezier approach angle
+    const startX = 200 + Math.random() * 800
+    const startY = 100 + Math.random() * 400
+    const cursor = createCursor(page as any, { x: startX, y: startY })
+
     // Re-read bounding box in case iframe moved during loading
     const freshBox = await iframe.boundingBox() ?? box
 
-    // Checkbox is ~28-36px from left edge, vertically centered in iframe
-    const clickX = freshBox.x + 28 + Math.random() * 8
-    const clickY = freshBox.y + freshBox.height / 2 - 2 + Math.random() * 4
-    info(`Attempt ${attempt}: moving to (${clickX.toFixed(0)}, ${clickY.toFixed(0)})`)
+    // Checkbox is ~24-40px from left edge, vertically centered in iframe
+    const clickX = freshBox.x + 24 + Math.random() * 16
+    const clickY = freshBox.y + freshBox.height / 2 - 4 + Math.random() * 8
+    info(`Attempt ${attempt}: cursor from (${startX.toFixed(0)},${startY.toFixed(0)}) to (${clickX.toFixed(0)}, ${clickY.toFixed(0)})`)
 
     await screenshot(page, `before-click-${attempt}`, info)
 
@@ -239,8 +242,9 @@ async function clickTurnstileCheckbox(
 
     await screenshot(page, `after-click-${attempt}`, info)
 
-    // Wait a moment for the widget to react, then capture state
-    await new Promise((r) => setTimeout(r, 2000))
+    // Variable wait for widget reaction (1.5-3.5s)
+    const postClickMs = 1500 + Math.random() * 2000
+    await new Promise((r) => setTimeout(r, postClickMs))
     await screenshot(page, `after-delay-${attempt}`, info)
 
     // Wait for challenge resolution — iframe disappears when solved (language-independent)

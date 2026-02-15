@@ -8,7 +8,7 @@ import { Page } from 'playwright-core';
  *  1. Locate the iframe element on the parent page
  *  2. Get its bounding box (works without cross-origin access)
  *  3. Use ghost-cursor to move the mouse along a Bezier curve to the
- *     checkbox coordinates (~28-36px from left, vertically centered)
+ *     checkbox coordinates (~24-40px from left, vertically centered)
  *  4. Click with human-like hesitation
  *
  * ghost-cursor generates Fitts's Law-timed Bezier paths that are

@@ -98,19 +98,22 @@ async function clickTurnstileCheckbox(page, iframe, info) {
     }
   }
   await screenshot(page, "widget-ready", info);
-  const cursor = createCursor(page);
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const startX = 200 + Math.random() * 800;
+    const startY = 100 + Math.random() * 400;
+    const cursor = createCursor(page, { x: startX, y: startY });
     const freshBox = await iframe.boundingBox() ?? box;
-    const clickX = freshBox.x + 28 + Math.random() * 8;
-    const clickY = freshBox.y + freshBox.height / 2 - 2 + Math.random() * 4;
-    info(`Attempt ${attempt}: moving to (${clickX.toFixed(0)}, ${clickY.toFixed(0)})`);
+    const clickX = freshBox.x + 24 + Math.random() * 16;
+    const clickY = freshBox.y + freshBox.height / 2 - 4 + Math.random() * 8;
+    info(`Attempt ${attempt}: cursor from (${startX.toFixed(0)},${startY.toFixed(0)}) to (${clickX.toFixed(0)}, ${clickY.toFixed(0)})`);
     await screenshot(page, `before-click-${attempt}`, info);
     await cursor.moveTo({ x: clickX, y: clickY });
     const hesitateMs = 200 + Math.random() * 300;
     await new Promise((r) => setTimeout(r, hesitateMs));
     await page.mouse.click(clickX, clickY);
     await screenshot(page, `after-click-${attempt}`, info);
-    await new Promise((r) => setTimeout(r, 2e3));
+    const postClickMs = 1500 + Math.random() * 2e3;
+    await new Promise((r) => setTimeout(r, postClickMs));
     await screenshot(page, `after-delay-${attempt}`, info);
     const resolved = await waitForTurnstileResolution(page, WAIT_FOR_RESOLVE_MS);
     if (resolved) {

@@ -162,8 +162,8 @@ async function isTurnstileResolved(page: Page): Promise<boolean> {
     // 4. No token input, no challenge script → page navigated away
     return true
   }).catch(() => {
-    // page.evaluate failed — page likely navigated (= resolved)
-    return true
+    // page.evaluate failed — page may be navigating, retry next poll
+    return false
   })
 }
 

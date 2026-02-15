@@ -70,7 +70,7 @@ async function isTurnstileResolved(page) {
     if (tokenInput) return false;
     return true;
   }).catch(() => {
-    return true;
+    return false;
   });
 }
 async function waitForTurnstileResolution(page, timeout) {
